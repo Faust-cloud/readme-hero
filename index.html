@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ReadmeHero · GitHub 封面图生成器</title>
+<style>
+  /* ============================================================
+     ReadmeHero — 应用界面样式
+     设计方向：干净、克制的开发者工具风，暖灰底 + 朱红强调色
+     ============================================================ */
+  :root {
+    --bg:        #f4f5f7;
+    --panel:     #ffffff;
+    --ink:       #1b1e24;
+    --ink-soft:  #6a717c;
+    --ink-faint: #9aa0aa;
+    --line:      #e6e8ec;
+    --line-2:    #eef0f3;
+    --accent:    #ff5a36;   /* 应用界面的强调色（和生成图的配色无关） */
+    --accent-ink:#ffffff;
+    --radius:    14px;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Menlo", "Consolas", monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", "Microsoft YaHei", sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+  }
+
+  /* ---------- 顶部标题栏 ---------- */
+  header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 18px 28px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+  }
+  .logo {
+    display: inline-grid;
+    place-items: center;
+    width: 34px; height: 34px;
+    border-radius: 9px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-size: 19px;
+  }
+  header h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.2px; }
+  header .sub { font-size: 13px; color: var(--ink-soft); font-weight: 400; }
+  header .spacer { flex: 1; }
+  header .ghlink {
+    font-size: 13px; color: var(--ink-soft); text-decoration: none;
+    border: 1px solid var(--line); padding: 7px 13px; border-radius: 9px;
+    transition: all .15s ease;
+  }
+  header .ghlink:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ---------- 主体两栏布局 ---------- */
+  .app {
+    display: grid;
+    grid-template-columns: 340px minmax(0, 1fr);
+    gap: 24px;
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 28px 28px 90px;
+  }
+
+  /* ---------- 左侧控制面板 ---------- */
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 20px;
+    align-self: start;
+  }
+  .field { margin-bottom: 18px; }
+  .field:last-child { margin-bottom: 0; }
+  .field label {
+    display: block;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    margin-bottom: 7px;
+    letter-spacing: .2px;
+  }
+  .field input[type="text"],
+  .field textarea {
+    width: 100%;
+    font-family: var(--sans);
+    font-size: 14px;
+    color: var(--ink);
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 12px;
+    transition: border-color .15s ease, background .15s ease;
+    resize: none;
+  }
+  .field input[type="text"]:focus,
+  .field textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    background: #fff;
+  }
+  .field .hint { font-size: 11.5px; color: var(--ink-faint); margin-top: 5px; }
+
+  /* 模板选择 */
+  .templates {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .tpl {
+    cursor: pointer;
+    border: 1.5px solid var(--line);
+    border-radius: 10px;
+    padding: 9px 10px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    background: var(--bg);
+    text-align: center;
+    transition: all .15s ease;
+    user-select: none;
+  }
+  .tpl:hover { border-color: var(--ink-faint); }
+  .tpl.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: #fff5f2;
+  }
+
+  /* 颜色选择 */
+  .swatches { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .swatch {
+    width: 26px; height: 26px; border-radius: 50%;
+    cursor: pointer; border: 2px solid #fff;
+    box-shadow: 0 0 0 1px var(--line);
+    transition: transform .12s ease, box-shadow .12s ease;
+  }
+  .swatch:hover { transform: scale(1.12); }
+  .swatch.active { box-shadow: 0 0 0 2px var(--ink); }
+  .swatch.custom { position: relative; overflow: hidden; display: grid; place-items: center;
+    background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red); }
+  .swatch.custom input { position: absolute; inset: -8px; opacity: 0; cursor: pointer; }
+
+  /* emoji 快捷选择 */
+  .emojis { display: flex; gap: 6px; flex-wrap: wrap; }
+  .emoji-btn {
+    width: 34px; height: 34px; border-radius: 9px;
+    border: 1px solid var(--line); background: var(--bg);
+    font-size: 17px; cursor: pointer; line-height: 1;
+    transition: all .12s ease;
+  }
+  .emoji-btn:hover { border-color: var(--ink-faint); }
+  .emoji-btn.active { border-color: var(--accent); background: #fff5f2; }
+  .emoji-input {
+    width: 54px !important; text-align: center; font-size: 16px !important;
+  }
+  .emoji-row { display: flex; gap: 8px; align-items: center; }
+
+  /* ---------- 右侧预览区 ---------- */
+  .preview-wrap { min-width: 0; }
+  .preview-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+  .preview-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .preview-head .title { font-size: 14px; font-weight: 600; }
+  .preview-head .size { font-size: 12px; color: var(--ink-faint); font-family: var(--mono); }
+
+  .canvas-frame {
+    position: relative;
+    width: 100%;
+    border-radius: 10px;
+    overflow: hidden;
+    background:
+      repeating-conic-gradient(#eef0f3 0% 25%, #f7f8fa 0% 50%) 50% / 22px 22px;
+    border: 1px solid var(--line-2);
+  }
+  #preview {
+    display: block;
+    width: 100%;
+    height: auto;   /* 保持 2:1 比例 */
+  }
+
+  .actions {
+    display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap;
+  }
+  .btn {
+    font-family: var(--sans);
+    font-size: 14px; font-weight: 600;
+    padding: 11px 18px; border-radius: 10px;
+    border: 1px solid var(--line); background: #fff; color: var(--ink);
+    cursor: pointer; transition: all .15s ease;
+  }
+  .btn:hover { border-color: var(--ink-faint); }
+  .btn.primary {
+    background: var(--accent); border-color: var(--accent); color: #fff;
+    box-shadow: 0 8px 20px -10px rgba(255,90,54,.8);
+  }
+  .btn.primary:hover { filter: brightness(1.05); border-color: var(--accent); }
+  .btn .ic { margin-right: 6px; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 70px; transform: translateX(-50%) translateY(20px);
+    background: var(--ink); color: #fff; font-size: 13px;
+    padding: 10px 18px; border-radius: 10px; opacity: 0;
+    pointer-events: none; transition: all .25s ease; z-index: 50;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* 窄屏：上下堆叠 */
+  @media (max-width: 820px) {
+    .app { grid-template-columns: minmax(0, 1fr); }
+    .panel { order: 2; }
+    .preview-wrap { order: 1; }
+  }
+</style>
+</head>
+<body>
+
+  <header>
+    <span class="logo">🦸</span>
+    <div>
+      <h1>ReadmeHero</h1>
+      <div class="sub">一键生成好看的 GitHub 项目封面图</div>
+    </div>
+    <span class="spacer"></span>
+    <a class="ghlink" href="https://github.com/Faust-cloud/readme-hero" target="_blank" rel="noopener">★ Star on GitHub</a>
+  </header>
+
+  <div class="app">
+
+    <!-- ============ 左侧：控制面板 ============ -->
+    <aside class="panel">
+
+      <div class="field">
+        <label>项目名</label>
+        <input type="text" id="in-name" value="ReadmeHero" maxlength="40" />
+      </div>
+
+      <div class="field">
+        <label>一句话简介</label>
+        <textarea id="in-subtitle" rows="2" maxlength="90">一键生成好看的 GitHub 项目封面图</textarea>
+      </div>
+
+      <div class="field">
+        <label>作者 / Handle（可选）</label>
+        <input type="text" id="in-author" value="@Faust-cloud" maxlength="30" />
+      </div>
+
+      <div class="field">
+        <label>模板风格</label>
+        <div class="templates" id="templates"></div>
+      </div>
+
+      <div class="field">
+        <label>主色</label>
+        <div class="swatches" id="swatches"></div>
+      </div>
+
+      <div class="field">
+        <label>图标 Emoji（可选）</label>
+        <div class="emoji-row">
+          <input type="text" id="in-emoji" class="emoji-input" value="🚀" maxlength="2" />
+          <div class="emojis" id="emojis"></div>
+        </div>
+        <div class="hint">点一下预设，或在左边框里换成任意 emoji；留空则不显示。</div>
+      </div>
+
+    </aside>
+
+    <!-- ============ 右侧：预览 + 操作 ============ -->
+    <section class="preview-wrap">
+      <div class="preview-card">
+        <div class="preview-head">
+          <span class="title">实时预览</span>
+          <span class="size">1280 × 640 px</span>
+        </div>
+        <div class="canvas-frame">
+          <!-- 画布内部按 2 倍分辨率渲染，保证下载的图清晰 -->
+          <canvas id="preview" width="2560" height="1280"></canvas>
+        </div>
+        <div class="actions">
+          <button class="btn primary" id="btn-download"><span class="ic">⬇</span>下载 PNG</button>
+          <button class="btn" id="btn-copy"><span class="ic">⧉</span>复制到剪贴板</button>
+          <button class="btn" id="btn-random"><span class="ic">🎲</span>随机换个风格</button>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   ReadmeHero — 核心逻辑
+   全部在浏览器本地运行，不上传任何数据。
+   ============================================================ */
+
+/* ---------- 画布基本参数 ---------- */
+const W = 1280, H = 640;          // 逻辑尺寸（GitHub 推荐的社交预览图尺寸）
+const SCALE = 2;                  // 2 倍分辨率，图更清晰
+const canvas = document.getElementById('preview');
+const ctx = canvas.getContext('2d');
+
+/* ---------- 小工具函数 ---------- */
+
+// hex -> {r,g,b}
+function hexToRgb(hex) {
+  const h = hex.replace('#', '');
+  const full = h.length === 3 ? h.split('').map(c => c + c).join('') : h;
+  const n = parseInt(full, 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+// 按比例调亮/调暗（amount: -1 ~ 1）
+function shade(hex, amount) {
+  const { r, g, b } = hexToRgb(hex);
+  const t = amount < 0 ? 0 : 255;
+  const p = Math.abs(amount);
+  const ch = v => Math.round((t - v) * p + v);
+  const toHex = v => v.toString(16).padStart(2, '0');
+  return '#' + toHex(ch(r)) + toHex(ch(g)) + toHex(ch(b));
+}
+
+// 根据背景色判断用深色还是浅色文字
+function readableInk(hex) {
+  const { r, g, b } = hexToRgb(hex);
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return lum > 0.6 ? '#1b1e24' : '#ffffff';
+}
+
+function rgba(hex, a) {
+  const { r, g, b } = hexToRgb(hex);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+// 文字换行：把 text 按最大宽度拆成多行，最多 maxLines 行
+function wrapLines(text, font, maxWidth, maxLines) {
+  ctx.font = font;
+  const chars = Array.from(text);
+  const lines = [];
+  let line = '';
+  for (const ch of chars) {
+    const test = line + ch;
+    if (ctx.measureText(test).width > maxWidth && line) {
+      lines.push(line);
+      line = ch;
+      if (lines.length === maxLines - 1) break;
+    } else {
+      line = test;
+    }
+  }
+  // 处理剩余字符（可能需要省略号）
+  let rest = chars.slice(lines.join('').length).join('');
+  if (lines.length < maxLines) {
+    if (ctx.measureText(rest).width > maxWidth) {
+      while (rest && ctx.measureText(rest + '…').width > maxWidth) rest = rest.slice(0, -1);
+      rest += '…';
+    }
+    if (rest) lines.push(rest);
+  }
+  return lines;
+}
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+/* ---------- 模板定义 ----------
+   每个模板是一个 draw(o) 函数，o = {name, subtitle, author, accent, emoji}
+   所有坐标用逻辑尺寸（1280×640），渲染前已 scale(2)。
+*/
+const SANS = '"PingFang SC", -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif';
+const MONO = '"SF Mono", "JetBrains Mono", Menlo, Consolas, monospace';
+
+const TEMPLATES = {
+  /* 1. 极简白 */
+  minimal: {
+    label: '极简白',
+    draw(o) {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, W, H);
+      // 左侧强调色竖条
+      ctx.fillStyle = o.accent;
+      ctx.fillRect(0, 0, 14, H);
+      // 顶部细网格点缀
+      ctx.fillStyle = rgba(o.accent, 0.06);
+      roundRect(W - 360, -160, 400, 400, 200); ctx.fill();
+
+      const padL = 96;
+      if (o.emoji) {
+        ctx.font = '92px ' + SANS;
+        ctx.textAlign = 'left';
+        ctx.fillText(o.emoji, padL, 190);
+      }
+      // 项目名
+      ctx.fillStyle = '#15181d';
+      ctx.font = '700 86px ' + SANS;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'alphabetic';
+      wrapLines(o.name, '700 86px ' + SANS, W - padL - 110, 1)
+        .forEach((l, i) => ctx.fillText(l, padL, 320 + i * 96));
+      // 简介
+      ctx.fillStyle = '#6a717c';
+      const subFont = '400 34px ' + SANS;
+      wrapLines(o.subtitle, subFont, W - padL - 110, 2)
+        .forEach((l, i) => { ctx.font = subFont; ctx.fillText(l, padL, 388 + i * 48); });
+      // 作者
+      if (o.author) {
+        ctx.fillStyle = o.accent;
+        ctx.font = '600 26px ' + MONO;
+        ctx.fillText(o.author, padL, H - 66);
+      }
+    }
+  },
+
+  /* 2. 科技深 */
+  tech: {
+    label: '科技深',
+    draw(o) {
+      // 深色径向背景
+      const g = ctx.createLinearGradient(0, 0, W, H);
+      g.addColorStop(0, '#0b1020');
+      g.addColorStop(1, '#131a2e');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+      // 强调色光晕
+      const glow = ctx.createRadialGradient(W - 220, 160, 20, W - 220, 160, 520);
+      glow.addColorStop(0, rgba(o.accent, 0.55));
+      glow.addColorStop(1, rgba(o.accent, 0));
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, 0, W, H);
+
+      const padL = 96;
+      // emoji 作为小胶囊标签
+      if (o.emoji) {
+        ctx.font = '600 30px ' + SANS;
+        const tagW = 72;
+        ctx.fillStyle = rgba(o.accent, 0.18);
+        roundRect(padL, 92, tagW, 64, 16); ctx.fill();
+        ctx.textAlign = 'center'; ctx.fillStyle = '#fff';
+        ctx.font = '36px ' + SANS;
+        ctx.fillText(o.emoji, padL + tagW / 2, 136);
+      }
+      ctx.textAlign = 'left';
+      // 项目名（带强调色）
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '800 90px ' + SANS;
+      wrapLines(o.name, '800 90px ' + SANS, W - padL - 90, 1)
+        .forEach((l, i) => ctx.fillText(l, padL, 328 + i * 98));
+      // 强调色下划线
+      ctx.fillStyle = o.accent;
+      ctx.fillRect(padL, 352, 120, 8);
+      // 简介
+      ctx.fillStyle = '#aeb6c7';
+      const subFont = '400 34px ' + SANS;
+      wrapLines(o.subtitle, subFont, W - padL - 90, 2)
+        .forEach((l, i) => { ctx.font = subFont; ctx.fillText(l, padL, 420 + i * 48); });
+      // 作者
+      if (o.author) {
+        ctx.fillStyle = rgba('#ffffff', 0.55);
+        ctx.font = '500 26px ' + MONO;
+        ctx.fillText(o.author, padL, H - 60);
+      }
+    }
+  },
+
+  /* 3. 活力渐变 */
+  vibrant: {
+    label: '活力渐变',
+    draw(o) {
+      const g = ctx.createLinearGradient(0, 0, W, H);
+      g.addColorStop(0, shade(o.accent, 0.15));
+      g.addColorStop(1, shade(o.accent, -0.35));
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+      // 柔和光斑
+      ctx.fillStyle = rgba('#ffffff', 0.10);
+      roundRect(-120, H - 220, 520, 520, 260); ctx.fill();
+      roundRect(W - 300, -200, 460, 460, 230); ctx.fill();
+
+      const ink = readableInk(shade(o.accent, -0.1));
+      ctx.textAlign = 'center';
+      // emoji
+      if (o.emoji) {
+        ctx.font = '96px ' + SANS;
+        ctx.fillText(o.emoji, W / 2, 210);
+      }
+      // 项目名
+      ctx.fillStyle = ink;
+      ctx.font = '800 92px ' + SANS;
+      wrapLines(o.name, '800 92px ' + SANS, W - 200, 1)
+        .forEach((l, i) => ctx.fillText(l, W / 2, (o.emoji ? 340 : 300) + i * 98));
+      // 简介
+      ctx.fillStyle = rgba(ink === '#ffffff' ? '#ffffff' : '#1b1e24', 0.82);
+      const subFont = '500 34px ' + SANS;
+      wrapLines(o.subtitle, subFont, W - 260, 2)
+        .forEach((l, i) => { ctx.font = subFont; ctx.fillText(l, W / 2, (o.emoji ? 408 : 368) + i * 48); });
+      // 作者
+      if (o.author) {
+        ctx.fillStyle = rgba(ink === '#ffffff' ? '#ffffff' : '#1b1e24', 0.7);
+        ctx.font = '600 26px ' + MONO;
+        ctx.fillText(o.author, W / 2, H - 56);
+      }
+    }
+  },
+
+  /* 4. 极客终端 */
+  terminal: {
+    label: '极客终端',
+    draw(o) {
+      ctx.fillStyle = '#0d1117';
+      ctx.fillRect(0, 0, W, H);
+      // 终端窗口
+      const mx = 80, my = 70, win = { x: mx, y: my, w: W - mx * 2, h: H - my * 2 };
+      ctx.fillStyle = '#161b22';
+      roundRect(win.x, win.y, win.w, win.h, 18); ctx.fill();
+      ctx.strokeStyle = '#2a3139'; ctx.lineWidth = 1.5;
+      roundRect(win.x, win.y, win.w, win.h, 18); ctx.stroke();
+      // 标题栏三个点
+      const dots = ['#ff5f56', '#ffbd2e', '#27c93f'];
+      dots.forEach((c, i) => {
+        ctx.fillStyle = c;
+        ctx.beginPath(); ctx.arc(win.x + 36 + i * 30, win.y + 36, 9, 0, Math.PI * 2); ctx.fill();
+      });
+      ctx.fillStyle = '#596273';
+      ctx.font = '22px ' + MONO; ctx.textAlign = 'center';
+      ctx.fillText('readme.md', win.x + win.w / 2, win.y + 44);
+
+      const px = win.x + 52;
+      let py = win.y + 130;
+      ctx.textAlign = 'left';
+      // 提示符行
+      ctx.font = '28px ' + MONO;
+      ctx.fillStyle = o.accent;
+      ctx.fillText('$', px, py);
+      ctx.fillStyle = '#8b949e';
+      ctx.fillText(' npx create ' + (o.author || 'project'), px + 28, py);
+      py += 70;
+      // 项目名（# 标题）
+      ctx.fillStyle = o.accent;
+      ctx.font = '700 40px ' + MONO; ctx.fillText('#', px, py + 8);
+      ctx.fillStyle = '#e6edf3';
+      ctx.font = '700 60px ' + MONO;
+      wrapLines(o.name, '700 60px ' + MONO, win.w - 160, 1)
+        .forEach(l => ctx.fillText(l + (o.emoji ? ' ' + o.emoji : ''), px + 54, py + 16));
+      py += 86;
+      // 简介（> 引用）
+      ctx.fillStyle = '#7d8590';
+      const subFont = '400 30px ' + MONO;
+      wrapLines('> ' + o.subtitle, subFont, win.w - 120, 2)
+        .forEach((l, i) => { ctx.font = subFont; ctx.fillText(l, px, py + i * 44); });
+      // 光标
+      ctx.fillStyle = o.accent;
+      ctx.fillRect(px, py + 76, 18, 32);
+    }
+  },
+
+  /* 5. 杂志感 */
+  editorial: {
+    label: '杂志感',
+    draw(o) {
+      ctx.fillStyle = '#f7f4ee';
+      ctx.fillRect(0, 0, W, H);
+      // 右侧强调色块
+      ctx.fillStyle = o.accent;
+      ctx.fillRect(W - 260, 0, 260, H);
+      if (o.emoji) {
+        ctx.textAlign = 'center'; ctx.font = '120px ' + SANS;
+        ctx.fillText(o.emoji, W - 130, H / 2 + 10);
+      }
+      const padL = 90;
+      ctx.textAlign = 'left';
+      // 小标签
+      ctx.fillStyle = o.accent;
+      ctx.font = '700 22px ' + MONO;
+      ctx.fillText('OPEN SOURCE PROJECT', padL, 128);
+      // 顶部横线
+      ctx.strokeStyle = '#1b1e24'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(padL, 150); ctx.lineTo(W - 300, 150); ctx.stroke();
+      // 项目名（衬线感：用粗体大字）
+      ctx.fillStyle = '#15181d';
+      ctx.font = '800 94px Georgia, "Songti SC", serif';
+      wrapLines(o.name, '800 94px Georgia, "Songti SC", serif', W - 300 - padL, 2)
+        .forEach((l, i) => ctx.fillText(l, padL, 290 + i * 96));
+      // 简介
+      ctx.fillStyle = '#55504a';
+      const subFont = 'italic 400 34px Georgia, "Songti SC", serif';
+      wrapLines(o.subtitle, subFont, W - 300 - padL, 2)
+        .forEach((l, i) => { ctx.font = subFont; ctx.fillText(l, padL, H - 150 + i * 46); });
+      // 作者
+      if (o.author) {
+        ctx.fillStyle = '#1b1e24';
+        ctx.font = '700 24px ' + MONO;
+        ctx.fillText(o.author, padL, H - 70);
+      }
+    }
+  }
+};
+
+/* ---------- 预设配色 & emoji ---------- */
+const PRESET_COLORS = ['#6366f1', '#ff5a36', '#0ea5e9', '#22c55e', '#f59e0b', '#ec4899', '#14b8a6', '#1b1e24'];
+const PRESET_EMOJIS = ['🚀', '⚡', '🛠️', '📦', '✨', '🧩', '🔥', '🤖'];
+
+/* ---------- 应用状态 ---------- */
+const state = {
+  name: 'ReadmeHero',
+  subtitle: '一键生成好看的 GitHub 项目封面图',
+  author: '@Faust-cloud',
+  template: 'tech',
+  accent: '#6366f1',
+  emoji: '🚀'
+};
+
+/* ---------- 渲染 ---------- */
+function render() {
+  ctx.save();
+  ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0); // 2 倍分辨率
+  ctx.clearRect(0, 0, W, H);
+  ctx.textBaseline = 'alphabetic';
+  TEMPLATES[state.template].draw(state);
+  ctx.restore();
+}
+
+/* ---------- 构建 UI ---------- */
+function buildTemplates() {
+  const box = document.getElementById('templates');
+  box.innerHTML = '';
+  Object.entries(TEMPLATES).forEach(([id, t]) => {
+    const el = document.createElement('div');
+    el.className = 'tpl' + (id === state.template ? ' active' : '');
+    el.textContent = t.label;
+    el.onclick = () => {
+      state.template = id;
+      document.querySelectorAll('.tpl').forEach(x => x.classList.remove('active'));
+      el.classList.add('active');
+      render();
+    };
+    box.appendChild(el);
+  });
+}
+
+function buildSwatches() {
+  const box = document.getElementById('swatches');
+  box.innerHTML = '';
+  PRESET_COLORS.forEach(c => {
+    const el = document.createElement('div');
+    el.className = 'swatch' + (c === state.accent ? ' active' : '');
+    el.style.background = c;
+    el.onclick = () => { setAccent(c); };
+    box.appendChild(el);
+  });
+  // 自定义颜色
+  const custom = document.createElement('div');
+  custom.className = 'swatch custom';
+  custom.title = '自定义颜色';
+  const picker = document.createElement('input');
+  picker.type = 'color';
+  picker.value = state.accent;
+  picker.oninput = e => setAccent(e.target.value, true);
+  custom.appendChild(picker);
+  box.appendChild(custom);
+}
+
+function setAccent(c, isCustom) {
+  state.accent = c;
+  document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+  if (!isCustom) {
+    const idx = PRESET_COLORS.indexOf(c);
+    const el = document.querySelectorAll('.swatch')[idx];
+    if (el) el.classList.add('active');
+  }
+  render();
+}
+
+function buildEmojis() {
+  const box = document.getElementById('emojis');
+  box.innerHTML = '';
+  PRESET_EMOJIS.forEach(em => {
+    const el = document.createElement('button');
+    el.className = 'emoji-btn' + (em === state.emoji ? ' active' : '');
+    el.textContent = em;
+    el.onclick = () => {
+      state.emoji = em;
+      document.getElementById('in-emoji').value = em;
+      document.querySelectorAll('.emoji-btn').forEach(x => x.classList.remove('active'));
+      el.classList.add('active');
+      render();
+    };
+    box.appendChild(el);
+  });
+}
+
+/* ---------- 绑定输入 ---------- */
+function bindInputs() {
+  document.getElementById('in-name').oninput = e => { state.name = e.target.value; render(); };
+  document.getElementById('in-subtitle').oninput = e => { state.subtitle = e.target.value; render(); };
+  document.getElementById('in-author').oninput = e => { state.author = e.target.value.trim(); render(); };
+  document.getElementById('in-emoji').oninput = e => {
+    state.emoji = Array.from(e.target.value)[0] || '';
+    document.querySelectorAll('.emoji-btn').forEach(x =>
+      x.classList.toggle('active', x.textContent === state.emoji));
+    render();
+  };
+}
+
+/* ---------- 导出 ---------- */
+function download() {
+  canvas.toBlob(blob => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const safe = (state.name || 'readme-hero').replace(/[^\w一-龥-]+/g, '-').toLowerCase();
+    a.href = url;
+    a.download = safe + '-banner.png';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('已下载 PNG ✓');
+  }, 'image/png');
+}
+
+async function copyToClipboard() {
+  try {
+    const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+    toast('已复制到剪贴板 ✓');
+  } catch (err) {
+    toast('这个浏览器不支持复制图片，请用下载按钮');
+  }
+}
+
+function randomStyle() {
+  const ids = Object.keys(TEMPLATES);
+  state.template = ids[Math.floor(Math.random() * ids.length)];
+  state.accent = PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)];
+  buildTemplates(); buildSwatches();
+  render();
+  toast('换了个风格 🎲');
+}
+
+/* ---------- 提示条 ---------- */
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 1800);
+}
+
+/* ---------- 初始化 ---------- */
+document.getElementById('btn-download').onclick = download;
+document.getElementById('btn-copy').onclick = copyToClipboard;
+document.getElementById('btn-random').onclick = randomStyle;
+buildTemplates();
+buildSwatches();
+buildEmojis();
+bindInputs();
+render();
+</script>
+
+</body>
+</html>
